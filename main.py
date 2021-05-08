@@ -6,7 +6,7 @@ import time
 state_name = "Uttar Pradesh"
 dist_name = "Lucknow"
 
-requests_cache.install_cache('cowin_cache', expire_after=600)
+requests_cache.install_cache('cowin_cache', expire_after=6000)
 
 headers = {
     'Accept-Language':'en_US',
@@ -21,7 +21,7 @@ def get_list_of_state_codes():
 
     if not response_states:
         response_states = requests.get("https://cdn-api.co-vin.in/api/v2/admin/location/states", headers = headers)
-        print("Time: {0} / Used Cache: {1}".format(datetime.now(), response_states.from_cache))
+        print("State Code Req: Time: {0} / Used Cache: {1}".format(datetime.now(), response_states.from_cache))
         response_states = response_states.json()
 
     return response_states
@@ -33,7 +33,7 @@ def get_list_of_district_codes(state_id):
     dist_url = "https://cdn-api.co-vin.in/api/v2/admin/location/districts/" + str(state_id)
     
     response_districts = requests.get(dist_url, headers = headers)
-    print("Time: {0} / Used Cache: {1}".format(datetime.now(), response_districts.from_cache))
+    print("District Code Req: Time: {0} / Used Cache: {1}".format(datetime.now(), response_districts.from_cache))
     response_districts = response_districts.json()
 
     return response_districts
@@ -91,7 +91,8 @@ def check_slots(state_name, dist_name):
             'date': today
         }
 
-        appointment = requests.get("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict", headers = headers, params = parameters).json()
+        with requests_cache.disabled():
+            appointment = requests.get("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict", headers = headers, params = parameters).json()
 
         for center in appointment["centers"]:
             for session in center["sessions"]:
