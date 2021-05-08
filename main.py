@@ -1,69 +1,110 @@
-import requests
+import requests, requests_cache
 from datetime import datetime, timedelta
 import smtplib, ssl
+import time
 
-state_name = "Maharashtra"
-dist_name = "Mumbai"
+state_name = "Uttar Pradesh"
+dist_name = "Lucknow"
+
+requests_cache.install_cache('cowin_cache', expire_after=600)
 
 headers = {
     'Accept-Language':'en_US',
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
 }
 
-response_states = requests.get("https://cdn-api.co-vin.in/api/v2/admin/location/states", headers = headers).json()
+response_states = None
+response_districts = None
 
-state_id = 0 
+def get_list_of_state_codes():
+    response_states = None
 
-for state in response_states['states']:
-    if(state["state_name"] == state_name):
-        state_id = state["state_id"]
-        print(state["state_name"] + " : " + str(state["state_id"]))
+    if not response_states:
+        response_states = requests.get("https://cdn-api.co-vin.in/api/v2/admin/location/states", headers = headers)
+        print("Time: {0} / Used Cache: {1}".format(datetime.now(), response_states.from_cache))
+        response_states = response_states.json()
 
+    return response_states
 
-dist_url = "https://cdn-api.co-vin.in/api/v2/admin/location/districts/" + str(state_id)
+def get_list_of_district_codes(state_id):
+    if not state_id:
+        return None
 
-response_district = requests.get(dist_url, headers = headers).json()
+    dist_url = "https://cdn-api.co-vin.in/api/v2/admin/location/districts/" + str(state_id)
+    
+    response_districts = requests.get(dist_url, headers = headers)
+    print("Time: {0} / Used Cache: {1}".format(datetime.now(), response_districts.from_cache))
+    response_districts = response_districts.json()
 
-# print(response_district['districts'])
+    return response_districts
 
-district_id = 0
+def get_state_id_from_name(state_name):
 
-for district in response_district['districts']:
-    if(district["district_name"] == dist_name):
-        district_id = district["district_id"]
-        print(district["district_name"] + " : " + str(district["district_id"]))
+    state_id = None
 
-# print(response_states.json())
-# print(response.url)
-# jprint(response.json())
+    global response_states
 
-today = datetime.today().strftime('%d-%m-%Y')
+    for state in response_states['states']:
+        if(state["state_name"] == state_name):
+            state_id = state["state_id"]
+            print(state["state_name"] + " : " + str(state["state_id"]))
 
-parameters = {
-    'district_id': district_id, 
-    'date': today
-}
+    return state_id
 
-for i in range(0,4):
-    today = (datetime.today() + timedelta(i*7)).strftime('%d-%m-%Y')
+def get_district_id_from_name(dist_name):
+
+    district_id = None
+
+    global response_district
+
+    for district in response_district['districts']:
+        if(district["district_name"] == dist_name):
+            district_id = district["district_id"]
+            print(district["district_name"] + " : " + str(district["district_id"]))
+
+    return district_id
+
+def check_slots(state_name, dist_name):
+
+    print("Checking slots for " + state_name + ": " + dist_name + "...")
+
+    global response_states, response_district
+
+    response_states = get_list_of_state_codes()
+    state_id = get_state_id_from_name(state_name)
+    response_district = get_list_of_district_codes(state_id)
+    district_id = get_district_id_from_name(dist_name)
+    today = datetime.today().strftime('%d-%m-%Y')
 
     parameters = {
         'district_id': district_id, 
         'date': today
     }
 
-    appointment = requests.get("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict", headers = headers, params = parameters).json()
+    flag = 0
 
-    for center in appointment["centers"]:
-        for session in center["sessions"]:
-            if(session["min_age_limit"] == 18 and session["available_capacity"] > 0):
-                print(center["name"] + " " + session["date"])
+    for i in range(0,4):
+        today = (datetime.today() + timedelta(i*7)).strftime('%d-%m-%Y')
 
-# today = (datetime.today() + timedelta(7)).strftime('%d-%m-%Y')
+        parameters = {
+            'district_id': district_id, 
+            'date': today
+        }
 
+        appointment = requests.get("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict", headers = headers, params = parameters).json()
 
+        for center in appointment["centers"]:
+            for session in center["sessions"]:
+                if(session["min_age_limit"] == 18 and session["available_capacity"] > 0):
+                    flag = 1
+                    print(center["name"] + ": " + session["date"] + ". Available Slots: " + session["available_capacity"])
 
+    if flag == 0:
+        print("No slots found.")
 
-# print(today)
+state_name = input("Enter State Name: ")
+dist_name = input("Enter District Name: ")
 
-# print(appointment)
+while(1):
+    check_slots(state_name, dist_name)
+    time.sleep(60)
