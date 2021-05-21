@@ -1,10 +1,10 @@
 import requests, requests_cache
 from datetime import datetime, timedelta
-import smtplib, ssl
 import time
+from tele import telegram_bot_sendtext
 
-state_name = "Uttar Pradesh"
-dist_name = "Lucknow"
+state_name = "Madhya Pradesh"
+dist_name = "Morena"
 
 requests_cache.install_cache('cowin_cache', expire_after=6000)
 
@@ -47,7 +47,7 @@ def get_state_id_from_name(state_name):
     for state in response_states['states']:
         if(state["state_name"] == state_name):
             state_id = state["state_id"]
-            print(state["state_name"] + " : " + str(state["state_id"]))
+            # print(state["state_name"] + " : " + str(state["state_id"]))
 
     return state_id
 
@@ -60,7 +60,7 @@ def get_district_id_from_name(dist_name):
     for district in response_district['districts']:
         if(district["district_name"] == dist_name):
             district_id = district["district_id"]
-            print(district["district_name"] + " : " + str(district["district_id"]))
+            # print(district["district_name"] + " : " + str(district["district_id"]))
 
     return district_id
 
@@ -94,17 +94,24 @@ def check_slots(state_name, dist_name):
         with requests_cache.disabled():
             appointment = requests.get("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict", headers = headers, params = parameters).json()
 
+
+        # print(appointment)
+
+        if "errors" in appointment:
+            print("Error occurred. Retrying")
+            continue
+
         for center in appointment["centers"]:
             for session in center["sessions"]:
                 if(session["min_age_limit"] == 18 and session["available_capacity"] > 0):
                     flag = 1
-                    print(center["name"] + ": " + session["date"] + ". Available Slots: " + session["available_capacity"])
+                    print(telegram_bot_sendtext(center["name"] + ": " + session["date"] + ". Available Slots: " + str(session["available_capacity"]) + " Last Updated at: " + str(datetime.now())))
 
     if flag == 0:
         print("No slots found.")
 
-state_name = input("Enter State Name: ")
-dist_name = input("Enter District Name: ")
+# state_name = input("Enter State Name: ")
+# dist_name = input("Enter District Name: ")
 
 while(1):
     check_slots(state_name, dist_name)
